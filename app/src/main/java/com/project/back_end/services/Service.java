@@ -1,6 +1,9 @@
 package com.project.back_end.services;
 
+@org.springframework.stereotype.Service
 public class Service {
+
+
 // 1. **@Service Annotation**
 // The @Service annotation marks this class as a service component in Spring. This allows Spring to automatically detect it through component scanning
 // and manage its lifecycle, enabling it to be injected into controllers or other services using @Autowired or constructor injection.
@@ -61,6 +64,9 @@ public class Service {
 // - Depending on which filters (condition, doctor name) are provided, it delegates the filtering logic to PatientService.
 // - If no filters are provided, it retrieves all appointments for the patient.
 // This flexible method supports patient-specific querying and enhances user experience on the client side.
+
+
+
 
 
 }
