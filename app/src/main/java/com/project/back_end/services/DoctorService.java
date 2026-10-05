@@ -46,13 +46,15 @@ public class DoctorService {
         LocalDateTime start = date.atStartOfDay();
         LocalDateTime end = date.plusDays(1).atStartOfDay();
 
-        Set<String> bookedStarts = appointmentRepository
-                .findByDoctorIdAndAppointmentTimeBetween(doctorId, start, end)
-                .stream()
+        List<Appointment> booked =
+                appointmentRepository.findByDoctorIdAndAppointmentTimeBetween(doctorId, start, end);
+
+        Set<String> bookedStarts = booked.stream()
                 .map(a -> a.getAppointmentTime().toLocalTime().format(HHMM))
                 .collect(Collectors.toSet());
 
-        return doctor.getAvailableTimes().stream()
+        List<String> slots = slotsOf(doctor);
+        return slots.stream()
                 .filter(slot -> !bookedStarts.contains(slotStart(slot)))
                 .collect(Collectors.toList());
     }
@@ -72,7 +74,7 @@ public class DoctorService {
 
     public int updateDoctor(Doctor doctor) {
         try {
-            if (!doctorRepository.existsById(doctor.getId())) return -1;
+            if (doctor.getId() == null || !doctorRepository.existsById(doctor.getId())) return -1;
             doctorRepository.save(doctor);
             return 1;
         } catch (Exception e) {
@@ -84,7 +86,7 @@ public class DoctorService {
     @Transactional
     public List<Doctor> getDoctors() {
         List<Doctor> doctors = doctorRepository.findAll();
-        doctors.forEach(d -> d.getAvailableTimes().size());   // force lazy load
+        initSlots(doctors);
         return doctors;
     }
 
@@ -125,65 +127,89 @@ public class DoctorService {
 
     @Transactional
     public Map<String, Object> findDoctorByName(String name) {
-        List<Doctor> doctors = doctorRepository.findByNameLike("%" + name + "%");
-        doctors.forEach(d -> d.getAvailableTimes().size());
+        List<Doctor> doctors = doctorRepository.findByNameLike(name);
+        initSlots(doctors);
         return Map.of("doctors", doctors);
     }
 
     @Transactional
     public Map<String, Object> filterDoctorsByNameSpecilityandTime(String name, String specialty, String amOrPm) {
         List<Doctor> doctors = doctorRepository
-                .findByNameContainingIgnoreCaseAndSpecialtyIgnoreCase(name, specialty);
+                .findByNameContainingIgnoreCaseAndSpecialityIgnoreCase(name, specialty);
         return Map.of("doctors", filterDoctorByTime(doctors, amOrPm));
     }
 
     @Transactional
     public Map<String, Object> filterDoctorByNameAndTime(String name, String amOrPm) {
-        List<Doctor> doctors = doctorRepository.findByNameLike("%" + name + "%");
+        List<Doctor> doctors = doctorRepository.findByNameLike(name);
         return Map.of("doctors", filterDoctorByTime(doctors, amOrPm));
     }
 
     @Transactional
     public Map<String, Object> filterDoctorByNameAndSpecility(String name, String specialty) {
         List<Doctor> doctors = doctorRepository
-                .findByNameContainingIgnoreCaseAndSpecialtyIgnoreCase(name, specialty);
-        doctors.forEach(d -> d.getAvailableTimes().size());
+                .findByNameContainingIgnoreCaseAndSpecialityIgnoreCase(name, specialty);
+        initSlots(doctors);
         return Map.of("doctors", doctors);
     }
 
     @Transactional
     public Map<String, Object> filterDoctorByTimeAndSpecility(String specialty, String amOrPm) {
-        List<Doctor> doctors = doctorRepository.findBySpecialtyIgnoreCase(specialty);
+        List<Doctor> doctors = doctorRepository.findBySpecialityIgnoreCase(specialty);
         return Map.of("doctors", filterDoctorByTime(doctors, amOrPm));
     }
 
     @Transactional
     public Map<String, Object> filterDoctorBySpecility(String specialty) {
-        List<Doctor> doctors = doctorRepository.findBySpecialtyIgnoreCase(specialty);
-        doctors.forEach(d -> d.getAvailableTimes().size());
+        List<Doctor> doctors = doctorRepository.findBySpecialityIgnoreCase(specialty);
+        initSlots(doctors);
         return Map.of("doctors", doctors);
     }
 
     @Transactional
     public Map<String, Object> filterDoctorsByTime(String amOrPm) {
-        return Map.of("doctors", filterDoctorByTime(doctorRepository.findAll(), amOrPm));
+        List<Doctor> doctors = doctorRepository.findAll();
+        return Map.of("doctors", filterDoctorByTime(doctors, amOrPm));
     }
 
     /** Keeps doctors with at least one slot in the requested AM/PM period. */
+    @Transactional
     public List<Doctor> filterDoctorByTime(List<Doctor> doctors, String amOrPm) {
         boolean wantAm = "AM".equalsIgnoreCase(amOrPm);
-        return doctors.stream()
-                .filter(d -> d.getAvailableTimes().stream().anyMatch(slot -> isAm(slot) == wantAm))
-                .collect(Collectors.toList());
+        List<Doctor> result = new ArrayList<>();
+        for (Doctor d : doctors) {
+            List<String> slots = slotsOf(d);   // also forces lazy loading
+            boolean match = slots.stream().anyMatch(slot -> isAm(slot) == wantAm);
+            if (match) result.add(d);
+        }
+        return result;
     }
 
     // ---------- Helpers ----------
+
+    /** Null-safe slot list for a doctor. */
+    private List<String> slotsOf(Doctor doctor) {
+        List<String> slots = doctor.getAvailableTimes();
+        return slots == null ? Collections.emptyList() : slots;
+    }
+
+    /** Forces lazy collections to load while the transaction is open. */
+    private void initSlots(List<Doctor> doctors) {
+        for (Doctor d : doctors) {
+            slotsOf(d).size();
+        }
+    }
 
     private String slotStart(String slot) {          // "09:00-10:00" -> "09:00"
         return slot.split("-")[0].trim();
     }
 
     private boolean isAm(String slot) {              // hour before 12 = AM
-        return Integer.parseInt(slotStart(slot).split(":")[0]) < 12;
+        try {
+            return Integer.parseInt(slotStart(slot).split(":")[0]) < 12;
+        } catch (NumberFormatException e) {
+            log.warn("Unrecognised slot format: {}", slot);
+            return false;
+        }
     }
 }

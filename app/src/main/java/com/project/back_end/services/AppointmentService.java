@@ -137,7 +137,7 @@ public class AppointmentService {
             LocalDateTime start = date.atStartOfDay();
             LocalDateTime end = date.plusDays(1).atStartOfDay();
 
-            Arrays appointments;
+            List<Appointment> appointments;
             if (patientName == null || patientName.isBlank() || "null".equalsIgnoreCase(patientName)) {
                 appointments = appointmentRepository
                         .findByDoctorIdAndAppointmentTimeBetween(doctor.getId(), start, end);

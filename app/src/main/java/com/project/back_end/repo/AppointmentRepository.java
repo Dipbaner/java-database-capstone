@@ -5,58 +5,47 @@ import jakarta.transaction.Transactional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 
 @Repository
 public interface AppointmentRepository extends JpaRepository<Appointment, Long> {
 
-    public List<Appointment> fndByDoctorIdAndAppointmentTimeBetween(
-            Long doctorId,
-            LocalDateTime start,
-            LocalDateTime end
-    );
+    List<Appointment> findByDoctorIdAndAppointmentTimeBetween(
+            Long doctorId, LocalDateTime start, LocalDateTime end);
 
-    public List<Appointment> findByDoctorIdAndPatient_NameContainingIgnoreCaseAndAppointmentTimeBetween(
-            Long doctorId,
-            String patientName,
-            LocalDateTime start,
-            LocalDateTime end
-    );
+    List<Appointment> findByPatientId(Long patientId);
 
-    @Modifying
-    @Transactional
-    public void deleteAllByDoctorId(Long doctorId);
-
-    public List<Appointment> findByPatientId(Long patientId);
-
-    public List<Appointment> findByPatient_IdAndStatusOrderByAppointmentTimeAsc(
-            Long patientId,
-            int status
-    );
-
-    public List<Appointment> filterByDoctorNameAndPatientId(
-            String doctorName,
-            Long patientId
-    );
-
-    public List<Appointment> filterByDoctorNameAndPatientIdAndStatus(
-            String doctorName,
-            Long patientId,
-            int status
-    );
-
-    public void updateStatus(int status, long id);
-
-
-    Arrays findByDoctorIdAndAppointmentTimeBetween(Long doctorId, LocalDateTime start, LocalDateTime end);
+    List<Appointment> findByPatient_IdAndStatusOrderByAppointmentTimeAsc(Long patientId, int status);
 
     @Query("SELECT a FROM Appointment a WHERE a.doctor.id = :doctorId " +
             "AND LOWER(a.patient.name) LIKE LOWER(CONCAT('%', :patientName, '%')) " +
             "AND a.appointmentTime BETWEEN :start AND :end")
-    Arrays filterByPatientNameAndDoctorIdAndTime(String patientName, Long id, LocalDateTime start, LocalDateTime end);
+    List<Appointment> filterByPatientNameAndDoctorIdAndTime(@Param("patientName") String patientName,
+                                                            @Param("doctorId") Long doctorId,
+                                                            @Param("start") LocalDateTime start,
+                                                            @Param("end") LocalDateTime end);
+
+    @Query("SELECT a FROM Appointment a WHERE LOWER(a.doctor.name) LIKE LOWER(CONCAT('%', :doctorName, '%')) " +
+            "AND a.patient.id = :patientId")
+    List<Appointment> filterByDoctorNameAndPatientId(@Param("doctorName") String doctorName,
+                                                     @Param("patientId") Long patientId);
+
+    @Query("SELECT a FROM Appointment a WHERE LOWER(a.doctor.name) LIKE LOWER(CONCAT('%', :doctorName, '%')) " +
+            "AND a.patient.id = :patientId AND a.status = :status")
+    List<Appointment> filterByDoctorNameAndPatientIdAndStatus(@Param("doctorName") String doctorName,
+                                                              @Param("patientId") Long patientId,
+                                                              @Param("status") int status);
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE Appointment a SET a.status = :status WHERE a.id = :id")
+    void updateStatus(@Param("status") int status, @Param("id") long id);
+
+    @Modifying
+    @Transactional
+    void deleteAllByDoctorId(Long doctorId);
 }

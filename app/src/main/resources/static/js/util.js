@@ -11,3 +11,7 @@
     localStorage.removeItem("userRole");
   }
   
+// Shared helpers, filled in on later pages
+function getToken() {
+  return localStorage.getItem("token");
+}

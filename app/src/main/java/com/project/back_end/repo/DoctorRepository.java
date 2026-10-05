@@ -2,24 +2,21 @@ package com.project.back_end.repo;
 
 import com.project.back_end.models.Doctor;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
 @Repository
 public interface DoctorRepository extends JpaRepository<Doctor, Long> {
+        Doctor findByEmail(String email);
 
-    public Doctor findByEmail(String email);
+        @Query("SELECT d FROM Doctor d WHERE LOWER(d.name) LIKE LOWER(CONCAT('%', :name, '%'))")
+        List<Doctor> findByNameLike(@Param("name") String name);
 
-    public List<Doctor> findByNameLike(String name);
+        List<Doctor> findByNameContainingIgnoreCaseAndSpecialityIgnoreCase(String name, String speciality);
 
-    public List<Doctor> findByNameContainingIgnoreCaseAndSpecialityIgnoreCase
-            (String name,
-             String speciality);
+        List<Doctor> findBySpecialityIgnoreCase(String speciality);
 
-    public List<Doctor> findBySpecialityIgnoreCase(String speciality);
-
-    List<Doctor> findBySpecialtyIgnoreCase(String specialty);
-
-    List<Doctor> findByNameContainingIgnoreCaseAndSpecialtyIgnoreCase(String name, String specialty);
 }
